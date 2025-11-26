@@ -13,76 +13,100 @@ library(randomForest)
 library(arules)
 library(arulesViz)
 library(factoextra)
+library(reshape2)
 
 
 # ============================================================
 # 2. LOAD DATA
 # ============================================================
+setwd("E:\\Kuliah\\Tugas\\SMT 5\\Data Mining\\Dataset")
 df <- read_csv("StudentPerformanceFactors.csv")
 
-# Struktur Dataset
+# ============================================================
+# 3. EDA
+# ============================================================
 glimpse(df)
-
-# Ringkasan Deskriptif Dataset
 summary(df)
 
-# Cek Missing Value
+# Total missing value di seluruh dataset
+print(sum(is.na(df)))
+
+# Jumlah missing value per kolom
 print(colSums(is.na(df)))
 
-# Cek Duplikat Value
+# Jumlah baris duplikat
 print(sum(duplicated(df)))
 
 
-# ANALISIS KORELASI FITUR (NUMERIK)
+# Cek Distribusi Fitur Numerik
+cat("HISTOGRAM DISTRIBUSI SETIAP FITUR NUMERIK")
 numeric_df <- df %>% select(where(is.numeric))
 
-# Hitung korelasi
-corr_matrix <- cor(numeric_df, use = "complete.obs")
+# long format untuk facet
+numeric_long <- melt(numeric_df)
 
-print(corr_matrix)
+ggplot(numeric_long, aes(x = value)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white", alpha = 0.8) +
+  facet_wrap(~ variable, scales = "free", ncol = 3) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Distribusi Histogram Fitur Numerik",
+    x = "Value",
+    y = "Frequency"
+  ) +
+  theme(panel.grid = element_blank())
 
-# ============================================================
-# CORRELATION HEATMAP (PURE GGPLOT2)
-# ============================================================
 
-library(reshape2)
+# Deteksi Outlier
+cat("OUTLIER DETECTION (IQR METHOD)")
 
-# Ambil fitur numerik
 numeric_df <- df %>% select(where(is.numeric))
 
-# Hitung matriks korelasi
-corr_matrix <- cor(numeric_df, use = "complete.obs")
+detect_outliers <- function(x) {
+  Q1  <- quantile(x, 0.25, na.rm = TRUE)
+  Q3  <- quantile(x, 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  lower_bound <- Q1 - 1.5 * IQR
+  upper_bound <- Q3 + 1.5 * IQR
+  sum(x < lower_bound | x > upper_bound)
+}
 
-# Ubah jadi long format
+outlier_counts <- sapply(numeric_df, detect_outliers)
+
+print(outlier_counts)
+
+
+cat("CORRELATION HEATMAP")
+corr_matrix <- cor(numeric_df, use = "complete.obs")
 corr_long <- melt(corr_matrix, varnames = c("Var1", "Var2"), value.name = "Correlation")
 
-# Plot korelasi dengan ggplot2
 ggplot(corr_long, aes(Var1, Var2, fill = Correlation)) +
   geom_tile(color = "white") +
   geom_text(aes(label = round(Correlation, 2)), size = 5) +
   scale_fill_gradient2(low = "blue", high = "red", mid = "white",
                        midpoint = 0, limit = c(-1, 1)) +
   theme_minimal(base_size = 14) +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
-    panel.grid = element_blank()
-  ) +
   labs(
     title = "Correlation Matrix (ggplot2)",
     x = "",
     y = ""
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    panel.grid = element_blank()
   )
-
 
 # ============================================================
 # 3. DATA CLEANING
 # ============================================================
 
-## Missing values
-df <- df %>% drop_na()
+# Hapus Noise
+df <- df %>% filter(Exam_Score <= 100)
 
-## Convert character → factor
-df <- df %>% mutate_if(is.character, as.factor)
+# Hapus duplikat baris jika ada
+df <- df %>% distinct()
+
+
 
 ## Normalization
 preproc <- preProcess(df, method = c("center", "scale"))
