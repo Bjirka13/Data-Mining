@@ -154,3 +154,76 @@ df$Exam_score_pass <- as.factor(ifelse(df$cluster == cluster_with_highest_score,
 
 cat("\nDistribusi kelas berdasarkan cluster:\n")
 print(table(df$Exam_score_pass))
+
+# ============================================================
+# CLASSIFICATION (TARGET: Exam_score_pass)
+# ============================================================
+
+target_col <- "Exam_score_pass"
+
+df_encoded <- df %>%
+  mutate(across(
+    where(is.character) & !all_of(target_col),
+    ~ as.numeric(factor(.))
+  )) %>%
+  mutate(across(
+    where(is.factor) & !all_of(target_col),
+    ~ as.numeric(as.character(.))
+  ))
+
+df_encoded[[target_col]] <- df$Exam_score_pass
+
+df_encoded <- df_encoded %>% select(-any_of(c("Exam_Score", "cluster")))
+
+preproc_class <- preProcess(df_encoded %>% select(-all_of(target_col)),
+                            method = c("center", "scale"))
+
+df_scaled <- df_encoded
+df_scaled[, setdiff(names(df_scaled), target_col)] <-
+  predict(preproc_class, df_encoded %>% select(-all_of(target_col)))
+
+set.seed(42)
+idx <- createDataPartition(df_scaled[[target_col]], p = 0.8, list = FALSE)
+train <- df_scaled[idx, ]
+test  <- df_scaled[-idx, ]
+
+str(train[[target_col]])
+
+model_dt <- rpart(as.formula(paste(target_col, "~ .")),
+                  data = train, method = "class")
+pred_dt <- predict(model_dt, test, type = "class")
+cm_dt <- confusionMatrix(pred_dt, test[[target_col]])
+
+model_rf <- randomForest(as.formula(paste(target_col, "~ .")), data = train)
+pred_rf <- predict(model_rf, test)
+cm_rf <- confusionMatrix(pred_rf, test[[target_col]])
+
+model_svm <- svm(as.formula(paste(target_col, "~ .")), data = train)
+pred_svm <- predict(model_svm, test)
+cm_svm <- confusionMatrix(pred_svm, test[[target_col]])
+
+# ============================================================
+# 6. EVALUATION SUMMARY
+# ============================================================
+cat("Decision Tree Accuracy:", cm_dt$overall["Accuracy"], "\n")
+cat("Random Forest Accuracy:", cm_rf$overall["Accuracy"], "\n")
+cat("SVM Accuracy:", cm_svm$overall["Accuracy"], "\n")
+
+# ============================================================
+# 7. ASSOCIATION RULES (Apriori)
+# ============================================================
+
+df_factor <- df %>%
+  mutate_if(is.numeric, function(x) as.factor(ntile(x, 5)))
+
+trans <- as(df_factor, "transactions")
+
+rules <- apriori(trans,
+                 parameter = list(supp = 0.05, conf = 0.4))
+
+inspect(head(sort(rules, by = "lift"), 10))
+plot(rules, method = "graph", engine = "htmlwidget")
+
+# ============================================================
+# DONE
+# ============================================================
