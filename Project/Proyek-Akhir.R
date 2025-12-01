@@ -24,13 +24,17 @@ df <- read_csv("StudentPerformanceFactors.csv")
 # ============================================================
 # 3. EDA
 # ============================================================
+cat("Struktur Dataset")
 glimpse(df)
+
+cat("Statistik Deskriptif")
 summary(df)
 
+cat("Jumlah Missing Value")
 print(sum(is.na(df)))
-
 print(colSums(is.na(df)))
 
+cat("Jumlah Duplicate Data")
 print(sum(duplicated(df)))
 
 cat("HISTOGRAM DISTRIBUSI SETIAP FITUR NUMERIK\n")
@@ -46,6 +50,7 @@ ggplot(numeric_long, aes(x = value)) +
        x = "Value", y = "Frequency") +
   theme(panel.grid = element_blank())
 
+# DEteksi Outlier dengan IQR
 cat("OUTLIER DETECTION (IQR METHOD)\n")
 detect_outliers <- function(x) {
   Q1 <- quantile(x, 0.25, na.rm = TRUE)
@@ -58,6 +63,7 @@ detect_outliers <- function(x) {
 
 outlier_counts <- sapply(numeric_df, detect_outliers)
 print(outlier_counts)
+
 
 cat("CORRELATION HEATMAP\n")
 corr_matrix <- cor(numeric_df, use = "complete.obs")
@@ -79,16 +85,19 @@ ggplot(corr_long, aes(Var1, Var2, fill = Correlation)) +
 # ============================================================
 # 3. DATA CLEANING
 # ============================================================
-
+# Handling Noise
 df <- df %>% filter(Exam_Score <= 100)
 
+# Handling Duplicate Data
 df <- df %>% distinct()
 
-Mode <- function(x) {
+# Deklarasi Fungsi Mode untuk pengganti missing value
+Mode <- function(x) { 
   ux <- unique(x[!is.na(x)])
   ux[which.max(tabulate(match(x, ux)))]
 }
 
+# Handling Missing Value dengan fungsi mode
 df <- df %>%
   mutate(across(where(is.character) | where(is.factor),
                 ~ ifelse(is.na(.), Mode(.), .)))
@@ -96,13 +105,15 @@ df <- df %>%
 # ============================================================
 # 4. PRE-PROCESSING
 # ============================================================
-
+#
 df_original_backup <- df
 
+# Filter Tabel Skewness
 df <- df %>% mutate(across(where(is.numeric), ~ log(. + 1)))
 
 df_cluster <- df %>% select(where(is.numeric))
 
+# Normalization
 preproc_cluster <- preProcess(df_cluster, method = c("center", "scale"))
 df_cluster_scaled <- predict(preproc_cluster, df_cluster)
 
