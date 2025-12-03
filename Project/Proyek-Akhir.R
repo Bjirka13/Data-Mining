@@ -350,20 +350,7 @@ ggplot(importance_df, aes(x = reorder(Feature, Importance), y = Importance)) +
        x = "Feature", y = "Importance Score") +
   theme_minimal()
 
-# ============================================================
-# 7. ASSOCIATION RULES (Apriori)
-# ============================================================
 
-df_factor <- df %>%
-  mutate_if(is.numeric, function(x) as.factor(ntile(x, 5)))
-
-trans <- as(df_factor, "transactions")
-
-rules <- apriori(trans,
-                 parameter = list(supp = 0.05, conf = 0.4))
-
-inspect(head(sort(rules, by = "lift"), 10))
-plot(rules, method = "graph", engine = "htmlwidget")
 
 # ============================================================
 # DONE
